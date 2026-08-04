@@ -86,6 +86,7 @@ GAF's site sits behind Akamai Bot Manager. Headless Chromium (and raw `curl`) ge
 
 ## Known limitations / not implemented
 
-- Live Perplexity and OpenAI integrations are implemented (`services/research.py`, `services/insight_generator.py`, wired into `POST /api/ingestion/run` when `USE_FIXTURES=false`) but not exercised against real API keys in this environment — fixture mode is the verified path.
+- Live Perplexity and OpenAI integrations (`services/research.py`, `services/insight_generator.py`) were run against all 85 real contractors with real API keys and a real Supabase Postgres instance (`scripts/run_live_enrichment.py`) — found genuine named decision-makers with source citations (BBB, LinkedIn, D&B, NYC DOB permits) for several contractors. Fixture mode remains the no-external-keys demo path.
+- `scoring_config.yaml`'s `opportunity.recent_project_activity.bands` (the `min_count`/`max_count`/`only_older` entries) are currently **dead config** — `scoring.py`'s `score_opportunity()` only reads that block's `max_points`; the actual thresholds (5+ projects → 30pts, 3-4 → 24, 1-2 → 15, older-only → 5, none → 0) are hardcoded in an if/elif chain in Python instead. Every other scoring bucket is genuinely config-driven; this one isn't yet — changing these five numbers today requires editing `scoring.py`, not the YAML.
 - P1 flag/regenerate routes are not built (P0-only scope per CLAUDE.md).
 - Commercial locator support exists in `gaf_scraper.py`'s constants but is not wired into ingestion (P0 is residential-only per PRD).
