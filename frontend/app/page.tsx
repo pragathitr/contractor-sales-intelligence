@@ -35,12 +35,19 @@ export default function Home() {
     };
   }, [params]);
 
+  const hasActiveFilters = Boolean(params.search || params.certification || params.minimum_rating);
+
   return (
     <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Roofing Sales Intelligence</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Contractors within 25 miles of ZIP 10013, ranked by deterministic Lead Priority.
+        </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+          <span className="font-medium">Lead Priority</span> = 65% Account Fit (profile strength — certification,
+          rating, distance, tenure) + 35% Opportunity (recent activity, hiring, verified contacts). Account Fit is
+          separately sortable.
         </p>
       </header>
 
@@ -54,7 +61,12 @@ export default function Home() {
           Failed to load leads: {error}. Is the backend running at {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}?
         </p>
       )}
-      {!loading && !error && total === 0 && (
+      {!loading && !error && total === 0 && hasActiveFilters && (
+        <div className="rounded-lg border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-700">
+          No leads match the current filters. Try clearing the certification or rating filter.
+        </div>
+      )}
+      {!loading && !error && total === 0 && !hasActiveFilters && (
         <div className="rounded-lg border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-700">
           No contractors have been ingested yet. Run a fixture seed or an ingestion pass to populate the dashboard.
         </div>

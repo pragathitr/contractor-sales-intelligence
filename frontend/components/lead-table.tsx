@@ -33,8 +33,12 @@ export function LeadTable({ items, onSelect }: Props) {
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
           <tr>
             <th className="px-4 py-3">Contractor</th>
-            <th className="px-4 py-3">Priority</th>
-            <th className="px-4 py-3">Account Fit</th>
+            <th className="px-4 py-3" title="Lead Priority = 65% Account Fit + 35% Opportunity. Default sort.">
+              Priority
+            </th>
+            <th className="px-4 py-3" title="Profile strength: certification, rating, distance, tenure. Separately sortable.">
+              Account Fit
+            </th>
             <th className="px-4 py-3">Certification</th>
             <th className="px-4 py-3">Rating</th>
             <th className="px-4 py-3">Distance</th>
