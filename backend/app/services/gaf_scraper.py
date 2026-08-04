@@ -145,7 +145,27 @@ def scrape_profile(page: Page, profile_url: str) -> dict:
         "distinctions": distinctions,
         "about_text": about_text,
         "website_url": website_url,
+        **extract_address(page),
     }
+
+
+def extract_address(page: Page) -> dict:
+    """GAF embeds a schema.org LocalBusiness JSON-LD block on every profile
+    page with a structured street address — cheaper and more reliable than
+    parsing the visible <address> element's free text."""
+    ld_json = page.locator("script[type='application/ld+json']")
+    for i in range(ld_json.count()):
+        try:
+            data = json.loads(ld_json.nth(i).inner_text())
+        except (ValueError, TypeError):
+            continue
+        address = data.get("address") if isinstance(data, dict) else None
+        if isinstance(address, dict) and address.get("streetAddress"):
+            return {
+                "address": address.get("streetAddress"),
+                "zip_code": address.get("Postalcode") or address.get("postalCode"),
+            }
+    return {"address": None, "zip_code": None}
 
 
 def _tier_rank(tier: str) -> int:

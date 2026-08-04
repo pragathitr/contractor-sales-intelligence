@@ -13,7 +13,7 @@ from app.config import get_settings, load_scoring_config
 from app.database import get_session
 from app.models import Contractor, Insight, LeadScore, ResearchFinding, SearchResult, SearchRun
 from app.schemas import IngestionRunResponse
-from app.services import gaf_scraper, insight_generator, research
+from app.services import gaf_scraper, insight_generator, research, research_mapping
 from app.services.scoring import AccountFitInputs, OpportunityInputs, score_account_fit, score_lead_priority, score_opportunity
 
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
@@ -47,42 +47,9 @@ def _upsert_contractor(session: Session, record: dict) -> Contractor:
     return contractor
 
 
-def _score_and_persist(session: Session, contractor: Contractor, distance_miles: float | None, config: dict) -> None:
-    account_fit_result = score_account_fit(
-        AccountFitInputs(
-            certification_tier=contractor.certification_tier,
-            distinctions=contractor.distinctions,
-            rating=contractor.rating,
-            review_count=contractor.review_count,
-            verified_services=None,
-            business_scale_signals=None,
-            distance_miles=distance_miles,
-            business_start_year=contractor.business_start_year,
-        ),
-        config,
-    )
-    opportunity_result = score_opportunity(OpportunityInputs(research_available=False), config)
-    lead_priority_result = score_lead_priority(account_fit_result, opportunity_result, config)
-
-    for result in (account_fit_result, opportunity_result, lead_priority_result):
-        session.add(
-            LeadScore(
-                contractor_id=contractor.id,
-                score_type=result.score_type,
-                total=result.total,
-                coverage=result.coverage,
-                breakdown=result.breakdown,
-                formula_version=result.formula_version,
-            )
-        )
-
-
-def _run_research_and_insight(session: Session, contractor: Contractor, config: dict) -> None:
-    """Live Perplexity + OpenAI stages. Only reached when USE_FIXTURES=False
-    and the relevant API key is configured; one contractor's failure never
-    stops the batch (PRD section 5)."""
-    settings = get_settings()
-
+def _run_research(session: Session, contractor: Contractor, settings) -> ResearchFinding:
+    """Live Perplexity stage. One contractor's failure never stops the batch
+    (PRD section 5) — caller persists status="failed" and moves on."""
     finding_row = ResearchFinding(contractor_id=contractor.id, status="pending")
     try:
         output = research.research_contractor(
@@ -104,14 +71,76 @@ def _run_research_and_insight(session: Session, contractor: Contractor, config: 
         finding_row.error = str(exc)
     session.add(finding_row)
     session.flush()
+    return finding_row
 
+
+def _score_and_persist(
+    session: Session, contractor: Contractor, distance_miles: float | None, research_payload: dict | None, config: dict
+) -> dict:
+    account_fit_result = score_account_fit(
+        AccountFitInputs(
+            certification_tier=contractor.certification_tier,
+            distinctions=contractor.distinctions,
+            rating=contractor.rating,
+            review_count=contractor.review_count,
+            verified_services=research_mapping.map_verified_services(research_payload) if research_payload else None,
+            business_scale_signals=research_mapping.map_business_scale_signals(research_payload) if research_payload else None,
+            distance_miles=distance_miles,
+            business_start_year=contractor.business_start_year,
+        ),
+        config,
+    )
+
+    if research_payload:
+        recent_count, only_older = research_mapping.recent_project_count(research_payload)
+        opportunity_inputs = OpportunityInputs(
+            research_available=True,
+            recent_project_count=recent_count,
+            only_older_activity=only_older,
+            hiring_expansion_signals=research_mapping.map_hiring_expansion_signals(research_payload),
+            most_recent_activity_days=research_mapping.most_recent_activity_days(research_payload),
+            product_demand_signals=research_mapping.map_product_demand_signals(research_payload),
+            decision_maker_tier=research_mapping.decision_maker_tier(research_payload),
+            contactability_signals=research_mapping.contactability_signals(research_payload),
+        )
+    else:
+        opportunity_inputs = OpportunityInputs(research_available=False)
+
+    opportunity_result = score_opportunity(opportunity_inputs, config)
+    lead_priority_result = score_lead_priority(account_fit_result, opportunity_result, config)
+
+    breakdown_by_type = {}
+    for result in (account_fit_result, opportunity_result, lead_priority_result):
+        session.add(
+            LeadScore(
+                contractor_id=contractor.id,
+                score_type=result.score_type,
+                total=result.total,
+                coverage=result.coverage,
+                breakdown=result.breakdown,
+                formula_version=result.formula_version,
+            )
+        )
+        breakdown_by_type[result.score_type] = {
+            "total": result.total,
+            "coverage": result.coverage,
+            "breakdown": result.breakdown,
+            "formula_version": result.formula_version,
+        }
+    return breakdown_by_type
+
+
+def _run_insight(
+    session: Session, contractor: Contractor, research_payload: dict | None, score_breakdown: dict, config: dict, settings
+) -> None:
+    """Live OpenAI stage. One contractor's failure never stops the batch."""
     insight_row = Insight(contractor_id=contractor.id, status="pending", version=1)
     try:
         product_categories = list(config["account_fit"]["product_service_alignment"]["services"].keys())
         output = insight_generator.generate_insight(
             contractor=contractor.model_dump(mode="json"),
-            research=finding_row.payload,
-            score_breakdown={},
+            research=research_payload,
+            score_breakdown=score_breakdown,
             product_categories=product_categories,
             version=1,
             settings=settings,
@@ -166,9 +195,17 @@ def run_ingestion(
                     distance_miles=record.get("distance_miles"),
                 )
             )
-            _score_and_persist(session, contractor, record.get("distance_miles"), config)
-            if not settings.use_fixtures and (settings.perplexity_api_key or settings.openai_api_key):
-                _run_research_and_insight(session, contractor, config)
+            research_payload = None
+            if not settings.use_fixtures and settings.perplexity_api_key:
+                finding_row = _run_research(session, contractor, settings)
+                if finding_row.status == "completed":
+                    research_payload = finding_row.payload
+
+            score_breakdown = _score_and_persist(session, contractor, record.get("distance_miles"), research_payload, config)
+
+            if not settings.use_fixtures and settings.openai_api_key:
+                _run_insight(session, contractor, research_payload, score_breakdown, config, settings)
+
             found += 1
         except Exception:  # noqa: BLE001 - one contractor failure must not fail the batch
             session.rollback()
