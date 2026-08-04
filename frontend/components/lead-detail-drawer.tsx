@@ -6,6 +6,7 @@ import { LeadDetailResponse } from "@/lib/types";
 import { certificationLabel, distinctionLabel } from "@/lib/format";
 import { ScoreBreakdownPanel } from "@/components/score-breakdown";
 import { SourceList } from "@/components/source-list";
+import { DecisionMakerList } from "@/components/decision-maker-list";
 import { StatusBadge } from "@/components/lead-table";
 
 interface Props {
@@ -140,6 +141,7 @@ export function LeadDetailDrawer({ contractorId, onClose }: Props) {
                     Last researched {new Date(detail.research.researched_at).toLocaleString()} · overall confidence{" "}
                     {detail.research.overall_confidence}
                   </p>
+                  <DecisionMakerList items={detail.research.decision_makers} showTechnical={showTechnical} />
                   <SourceList title="Services" items={detail.research.services} showTechnical={showTechnical} />
                   <SourceList title="Service territories" items={detail.research.service_territories} showTechnical={showTechnical} />
                   <SourceList title="Recent projects (18 months)" items={detail.research.recent_projects} showTechnical={showTechnical} />
