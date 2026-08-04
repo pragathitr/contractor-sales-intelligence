@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+backend/dev.db
+backend/.venv/
+node_modules/
+frontend/.next/
+.env
+*.env.local

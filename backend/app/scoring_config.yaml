@@ -1,0 +1,131 @@
+# Scoring weights, bucket thresholds, and formula versions for the roofing
+# sales-intelligence MVP. Loaded once at startup (see app/services/scoring.py)
+# and passed into scoring functions as an argument — scoring functions never
+# read this file themselves. Bump the relevant formula_version when changing
+# any weight or threshold; persisted scores keep the version that produced them.
+
+account_fit:
+  formula_version: account-fit-v1
+
+  certification_tier:
+    max_points: 20
+    points:
+      master_elite: 20
+      certified_plus: 14
+      certified: 8
+      other_verified: 5
+
+  distinctions:
+    max_points: 5
+    presidents_club: 5
+    other_distinction: 2
+
+  rating:
+    max_points: 10
+    bands:
+      - {min: 4.80, max: 5.01, points: 10}
+      - {min: 4.50, max: 4.80, points: 8}
+      - {min: 4.00, max: 4.50, points: 5}
+      - {min: 0.00, max: 4.00, points: 2}
+
+  review_volume:
+    max_points: 10
+    bands:
+      - {min: 100, max: null, points: 10}
+      - {min: 50, max: 100, points: 8}
+      - {min: 20, max: 50, points: 6}
+      - {min: 5, max: 20, points: 3}
+      - {min: 1, max: 5, points: 1}
+      - {min: 0, max: 1, points: 0}
+
+  product_service_alignment:
+    max_points: 20
+    services:
+      residential_replacement_or_shingles: 6
+      repair_or_maintenance: 3
+      ventilation_or_accessories: 3
+      solar_roofing: 3
+      metal_roofing: 3
+      commercial_roofing_or_coatings: 2
+
+  business_scale:
+    max_points: 15
+    signals:
+      two_plus_locations: 5
+      multiple_counties_or_boroughs: 3
+      multiple_crews_or_capacity: 4
+      five_plus_recent_projects: 3
+
+  territory_fit:
+    max_points: 10
+    bands:
+      - {min: 0, max: 5, points: 10}
+      - {min: 5, max: 10, points: 8}
+      - {min: 10, max: 15, points: 6}
+      - {min: 15, max: 20, points: 4}
+      - {min: 20, max: 25, points: 2}
+      - {min: 25, max: null, points: 0}
+
+  years_in_business:
+    max_points: 10
+    bands:
+      - {min: 15, max: null, points: 10}
+      - {min: 8, max: 15, points: 8}
+      - {min: 3, max: 8, points: 5}
+      - {min: 0, max: 3, points: 3}
+
+opportunity:
+  formula_version: opportunity-v1
+
+  recent_project_activity:
+    max_points: 30
+    bands:
+      - {min_count: 5, max_count: null, points: 30}
+      - {min_count: 3, max_count: 5, points: 24}
+      - {min_count: 1, max_count: 3, points: 15}
+      - {min_count: 0, max_count: 1, points: 5, only_older: true}
+      - {min_count: 0, max_count: 1, points: 0, only_older: false}
+
+  hiring_or_expansion:
+    max_points: 20
+    signals:
+      new_location_or_territory: 8
+      relevant_active_hiring: 6
+      new_service_or_category: 4
+      additional_crews_or_capacity: 2
+
+  recent_public_activity:
+    max_points: 15
+    bands:
+      - {max_days: 90, points: 15}
+      - {max_days: 180, points: 10}
+      - {max_days: 365, points: 6}
+      - {max_days: 540, points: 3}
+      - {max_days: null, points: 0}
+
+  product_demand_trigger:
+    max_points: 15
+    signals:
+      recent_project_tied_to_product: 6
+      newly_added_service: 5
+      expansion_implying_material_demand: 4
+
+  verified_decision_maker:
+    max_points: 10
+    points:
+      key_contact: 10
+      other_management_contact: 6
+      none_verified: 0
+
+  contactability:
+    max_points: 10
+    signals:
+      direct_business_email: 5
+      direct_business_phone: 3
+      generic_contact: 2
+
+lead_priority:
+  formula_version: lead-priority-v1
+  account_fit_weight: 0.65
+  opportunity_weight: 0.35
+  provisional_coverage_threshold: 60
