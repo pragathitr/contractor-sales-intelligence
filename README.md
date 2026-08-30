@@ -1,4 +1,4 @@
-# Roofing Sales Intelligence MVP
+# Roofing Contractors Sales Intelligence Platform (Multi-source enrichment pipeline)
 
 AI-assisted sales-intelligence dashboard for a roofing-material distributor. Collects residential roofing contractors near ZIP `10013` from GAF, scores them deterministically, enriches them with source-backed research, and generates account-planning guidance for sales reps. See `PRD.md` for the full spec and `CLAUDE.md` for build guardrails.
 
